@@ -64,14 +64,31 @@ For many years I crafted large topologies in the dark.  I'd track progress by US
 Launching multiple cutters is a key component but exactly how one controls those processes is beyond this document.  Automation is always a goal but at the same time the danger of corruption often argues for closer management and scrutiny of each cut.  I am a bit ashamed to admit I often just pop off cutting actions as individual pgAdmin or nohup psql commands.  Crafting a control system would be swell but at the same time each topology is unique and for my purposes a one-time event.  Your critiques of my mismanagement of the process and suggestions for automation are always accepted.
 
 Most often topologies are created by just randomly throwing geometry into the maw.  With one cutting process it may not matter much.  There is almost certainly is a more performant order but determining that order may well cost more time and effort than chucking things in randomly.  But that is not option if you plan to use multiple cutters.  Multiple cutters **must** stay away from each other and **must never** try to alter the same face - with the exception of face zero.   If you accidentally create a BHF, then only one cutter may ever approach that region.  Avoid at all costs.  You need a plan of some kind.  Break your work into discrete regions either by some kind of attribute (say a state or province code) or spatially.  The latter approach can be fraught as your source data is not guaranteed to ever be sensible.  You might have a very long and spindly face that cuts across two areas you assume to be spatially distinct. In this example I was cutting on the Alabama Gulf coast with a nice gap between the workers.  But note the danger of the beach polygon closing a good third of my gap.  
-[images/dangerous_gap.png]
-Make that gap smaller and add another spindly beach reaching out from other side and its disaster.  From this point onward I will keep all cutters far, far away from this danger point until all the area to the north is complete.  I am exageraging the danger a bit as I have outlets still to the northeast.  But eventually this will all tighten up and the risks will then be more real.
+![Dangerous Gap](images/dangerous_gap.png)
 
-Note a small BHF may not be the end of things.  Its never ideal as cutting against any face other than face zero is more expensive.  But if it happens and its not that large, then start bisecting it into smaller portions over and over until you can close the entire thing.  If you have 13 cores cutting on face zero and one core puttering about dicing up a BHF, that is probably okay.  But be careful.  The urge might be to bisect the BHF and put two cores on the two new faces.  But the risk is real that they bump into each other.  Finding corruption is a bad day, having it happen and not noticing can be a bad week.  I tend to just play it safe and only use one core around a BHF.  
+Make that gap smaller and add another spindly beach reaching out from other side and its disaster.  From this point onward I will keep all cutters far, far away from this danger point until all the area to the north is complete (slight exaggeration as I have outlets still to the northeast).
+
+Note a small BHF caught early may not be the end of things.  Its never ideal as cutting against any face other than face zero is more expensive.  But if it happens and its not that large, then start bisecting it into smaller portions over and over until you can close the entire thing.  If you have 13 cores cutting on face zero and one core puttering about dicing up a BHF, that is probably okay.  But be careful.  The urge might be to bisect the BHF and put two cores on the two new faces.  But the risk is real that they bump into each other.  Finding corruption is a bad day, having it happen and not noticing can be a bad week.  I tend to just play it safe and only use one core around a BHF.  
 
 #### Maintenance
 
-Users should become familiar with the pgtopo_export and pgtopo_import commands.  You **will** corrupt your topology.  It just happens.  By far the easiest fix is to fall back to the last good backup.  I would advise (at least) a daily backup regime.  Knowing when your topology has gone bad is another important issue.  Validate the thing, as much as possible, as often as possible.  The worst scenario would be to corrupt some far corner of your topology and not realize it until days or weeks later.  Cutting out corruption is a fraught and complex topic not fully addressed here.  
+##### Backup Often
+
+Users should become familiar with the pgtopo_export and pgtopo_import commands.  You **will** corrupt your topology.  It just happens.  By far the easiest fix is to fall back to the last good backup.  I would advise (at least) a daily backup regime.  
+
+##### Validation
+
+Knowing when your topology has gone bad is another important issue.  Validate the thing, as much as possible, as often as possible.  The worst scenario would be to corrupt some far corner of your topology and not realize it until days or weeks later.  some caveats: 
+
+* The tool is sensitive to being run at the same time cutting is taking place.  Its all about transaction isolation and it **seems** to not quite be isolated enough.  Running at the same time as cutting is okay is suitably isolaated (maybe) but if you catch any part of the topology in flux it can report erroneous corruption.  That is both scary and unnessary for one's blood pressure.  I would recommend running only when the topology is at rest.
+
+* Validating your entire topology in one go will eventually be impossible (or at least I am not willing to wait days for results).  The validation process examines how all elements interact and builds the polygon rings from faces.  Chunking the process out into smaller bites will help - though chunking those bites across multiple processors will help even more.
+
+##### Removing Unused Primitives
+
+The Remove Unused Primitives tool is useful to prune down the size of your topology.  Normal face creation inserts unneeded edges and nodes as a matter of course.  Foir my current effort, when I reached about 15 million edges I was able to remove about a million edges using this tool.  That is significant.  But some caveats:  
+
+* The tool cannot run at the same time cutting is taking place, even when separated by half the globe and face 0.  I need to look closer but the tool seems to alter something midstream that greatly upsets any AddFace transactions.  You should only run this tool (or tools) when the topology is at rest.
 
 #### Corruption
 
@@ -81,7 +98,7 @@ This section is meant to contain actionable advice for creators of large topolog
 
 ##### Tossing out constraints
 
-Constraints are great, constraints are good, constraints are your friend.  They can potentially stop you from corrupting your topology.  But they have a cost as each alteration of the edge table must check that node and face ids exist over in those respective tables and next edges exist within itself.  Chatter from strk notes that constraints are not a requirement for building a topology, rather more of a safety net.  Just don't fall.
+Constraints are great, constraints are good, constraints are your friend.  They can potentially stop you from corrupting your topology.  But they have a cost as each alteration of the edge table must check that node and face ids exist over in those respective tables and next edges exist within itself.  Chatter from strk notes that constraints are not a requirement for building a topology, rather more of a safety net.  Just don't fall off the wire.
 ```
 ALTER TABLE topology_name.edge_data DROP CONSTRAINT end_node_exists;
 ALTER TABLE topology_name.edge_data DROP CONSTRAINT left_face_exists;
