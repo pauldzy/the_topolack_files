@@ -10,11 +10,14 @@ Please note the [desktop Topology functionality](https://pro.arcgis.com/en/pro-a
 * [Resources](#resources)
 * [PostgreSQL](#postgresql)
 * [Preparation](#preparation)
-* [Multi-Processing](#multi-processing)
 * [Monitoring](#monitoring)
+* [Multi-Processing](#multi-processing)
 * [Maintenance](#maintenance)
 * [Corruption](#corruption)
 * [Mitigation](#mitigation)
+* [Future Directions](#future-directions)
+* [Useful Links](#useful-links)
+* [Disclaimer](#disclaimer)
 
 #### Use Case
 
@@ -40,50 +43,58 @@ But SQL-MM topologies capture how every element relates to its planar neighbors.
 
 #### Resources
 
-It would be interesting to know what other folks have available for tasks like this.  In my case I am using a little home server with 128 GB of RAM, 16 AMD cores and 2 mid-range NVME drives.  The database runs on the stock [PostGIS docker image](https://hub.docker.com/r/postgis/postgis/) on an Ubuntu host.  More cores and faster drives is always better but I don't myself know of absolute thresholds.  I do think trying this kind of thing on a 16GB Windows laptop is not going to work.
+It would be interesting to know what other folks have available for tasks like this.  In my case I am using a little home server with 128 GB of RAM, 16 AMD cores and 2 mid-range NVME drives.  The database runs on the stock Debian PostgreSQL 16.8 [PostGIS docker image](https://hub.docker.com/r/postgis/postgis/) 3.5.2 on an Ubuntu host.  More cores and faster drives is always better but I don't myself know of absolute thresholds.  I do think trying this kind of thing on a 16GB Windows laptop is not going to work.
 
 #### PostgreSQL
 
-If you have access to your PostgreSQL configuration then tweaking things towards a small number of connections gorging on system resources is helpful.  Well, unless you share the database with others!  As I am the sole tenant, I set shared buffers to 1/3 of memory, effective cache to 3/4 of memory, stretch out the WAL to 64GB, set up huge pages using tuned for PostgreSQL.  But your ability to change this may be restricted with cloud or shared resources.  I feel being able to shove critical resources into the cache is vital but there is little benchmarking in this document. 
+If you have access to your PostgreSQL configuration then tweaking things towards a small number of connections gorging on all available system resources is helpful.  Well, unless you share the database with others!  As I am the sole tenant, I set shared buffers to 1/3 of memory, effective cache to 3/4 of memory, stretch out the WAL to 64GB, set up huge pages using tuned for PostgreSQL.  But your ability to change this may be restricted with cloud or shared resources.  I feel being able to shove critical resources into the cache is vital but there is little benchmarking in this document. 
 
 If you believe this will result in occasional OOM killing by the host OS, you are correct.  See [note 18.4.4](https://www.postgresql.org/docs/current/kernel-resources.html#LINUX-MEMORY-OVERCOMMIT) for details on skirting this issue AND be aware that certain kills can corrupt your topology.  Setting overcommit to "2" mitigates the issue _mostly_ for Ubuntu 24.  At least kills in mode 2 never seem to corrupt my topologies.  Dancing on the edge is dangerous.
 
 #### Preparation
 
-Going into topology creation with both a valid and clean layer is important.  Invalid polygons are just a show stopper, you gotta fix it first.  Messy (but valid) polygons are a slightly different issue.  In this reference the new PostGIS coverage concepts. Ideally you want to start with a clean coverage to craft the most compact topology possible.  If your goal is to load a bad coverage to do the cleanup, well that is out of this document's scope. Every face comes with a cost and if your input is a mess you will have many faces per entity, greatly expanding out the creation cost.  I can't afford that cost when crafting my large topologies so thus clean things up beforehand.  The new PostGIS 3.6 coverage tools should be helpful and just tidying up the layer in a desktop GIS is always a solid approach.  The aforementioned Esri topology is quite helpful in determining how clean or dirty your coverage is.
-
-#### Multi-Processing
-
-Launching multiple cutters is a key component but exactly how one manages those processes is beyond this document.  Automation is always a goal but at the same time the danger of corruption often argues for closer management and scrutiny of each cut.  I am a bit ashamed to admit I often just pop off cutting actions as individual psql commands.  Crafting a control system would be swell but at the same time each topology is unique and for my purposes a one-time event.  Your critiques of my mismanagement of the process and suggestions for automation are always accepted.    
+Going into topology creation with both a valid and clean layer is important.  Invalid polygons are just a show stopper, you gotta fix it first.  Messy (but valid) polygons are a slightly different issue.  When the source data is large, ideally you want to start with a clean vector coverage to craft the most compact topology possible.  If your goal is to load a bad coverage to do that cleanup using topology logic, well that is out of this document's scope. Every face comes with a cost and if your input is a mess you will have many faces per entity, greatly expanding out the creation cost.  I can't afford that cost when crafting my large topologies so thus I clean things up beforehand.  The new [PostGIS 3.6 coverage tools](https://postgis.net/docs/reference.html#Coverage) should be helpful and just tidying up the layer in a desktop GIS is always a solid approach.  Its a tad ironic but the aforementioned Esri topology functionality can be quite helpful in determining how clean or dirty your input layer is.
 
 #### Monitoring
 
-For many years I crafted large topologies in the dark.  I'd track progress by US state codes with a vague idea where each cutter was acting.  This is dangerous for many of the reasons highlighted in this document.  Its very helpful to keep a close eye on the process.  QGIS is an excellent desktop tool for this.  Just add your edge table to a map and watch things build.  This can help you spot BHFs or the risk of creating BHFs.  One can harvest bounding boxes directly from QGIS to drive your cutting.  
+For many years I crafted large topologies in the dark.  I'd track progress by US state codes with only a vague idea where each cutter was acting.  This is dangerous for many of the reasons highlighted in this document.  Its very helpful to keep a close eye on the process.  QGIS is an excellent desktop tool for this.  Just add your edge table to a map project and watch things build.  This can help you spot BHFs or the risk of creating BHFs.  One can harvest bounding boxes directly from QGIS to drive your cutting.  
+
+#### Multi-Processing
+
+Launching multiple cutters is a key component but exactly how one controls those processes is beyond this document.  Automation is always a goal but at the same time the danger of corruption often argues for closer management and scrutiny of each cut.  I am a bit ashamed to admit I often just pop off cutting actions as individual pgAdmin or nohup psql commands.  Crafting a control system would be swell but at the same time each topology is unique and for my purposes a one-time event.  Your critiques of my mismanagement of the process and suggestions for automation are always accepted.
+
+Most often topologies are created by just randomly throwing geometry into the maw.  With one cutting process it may not matter much.  There is almost certainly is a more performant order but determining that order may well cost more time and effort than chucking things in randomly.  But that is not option if you plan to use multiple cutters.  Multiple cutters **must** stay away from each other and **must never** try to alter the same face - with the exception of face zero.   If you accidentally create a BHF, then only one cutter may ever approach that region.  Avoid at all costs.  You need a plan of some kind.  Break your work into discrete regions either by some kind of attribute (say a state or province code) or spatially.  The latter approach can be fraught as your source data is not guaranteed to ever be sensible.  You might have a very long and spindly face that cuts across two areas you assume to be spatially distinct. In this example I was cutting on the Alabama Gulf coast with a nice gap between the workers.  But note the danger of the beach polygon closing a good third of my gap.  
+[images/dangerous_gap.png]
+Make that gap smaller and add another spindly beach reaching out from other side and its disaster.  From this point onward I will keep all cutters far, far away from this danger point until all the area to the north is complete.  I am exageraging the danger a bit as I have outlets still to the northeast.  But eventually this will all tighten up and the risks will then be more real.
+
+Note a small BHF may not be the end of things.  Its never ideal as cutting against any face other than face zero is more expensive.  But if it happens and its not that large, then start bisecting it into smaller portions over and over until you can close the entire thing.  If you have 13 cores cutting on face zero and one core puttering about dicing up a BHF, that is probably okay.  But be careful.  The urge might be to bisect the BHF and put two cores on the two new faces.  But the risk is real that they bump into each other.  Finding corruption is a bad day, having it happen and not noticing can be a bad week.  I tend to just play it safe and only use one core around a BHF.  
 
 #### Maintenance
 
-Users should become familiar with the pgtopo_export and pgtopo_import commands.  You **will** corrupt your topology.  It just happens.  By far the easiest fix is to fall back to the last good backup.  I would advise (at least) a daily backup regime.  Knowing when your topology has gone bad is another important issue.  Validate the thing, as much as possible, as often as possible.  The worst scenario would be to corrupt some far corner of your topology and not realize it until days or weeks later.  Cutting out corruption is a fraught and complex topic not addressed here.  
+Users should become familiar with the pgtopo_export and pgtopo_import commands.  You **will** corrupt your topology.  It just happens.  By far the easiest fix is to fall back to the last good backup.  I would advise (at least) a daily backup regime.  Knowing when your topology has gone bad is another important issue.  Validate the thing, as much as possible, as often as possible.  The worst scenario would be to corrupt some far corner of your topology and not realize it until days or weeks later.  Cutting out corruption is a fraught and complex topic not fully addressed here.  
 
 #### Corruption
 
 #### Mitigation
 
- 
+This section is meant to contain actionable advice for creators of large topologies.  Do provide feedback if this is helpful or even more importantly, if not.  Careful benchmarking results obviously would be helpful but one only has so much time and energy to spend.
 
+##### Tossing out constraints
 
-Approaches for building large PostGIS topologies via multiprocessing.
+Constraints are great, constraints are good, constraints are your friend.  They can potentially stop you from corrupting your topology.  But they have a cost as each alteration of the edge table must check that node and face ids exist over in those respective tables and next edges exist within itself.  Chatter from strk notes that constraints are not a requirement for building a topology, rather more of a safety net.  Just don't fall.
+```
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT end_node_exists;
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT left_face_exists;
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT next_left_edge_exists;
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT next_right_edge_exists;
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT right_face_exists;
+ALTER TABLE topology_name.edge_data DROP CONSTRAINT start_node_exists;
+ALTER TABLE topology_name.face      DROP CONSTRAINT face_exists;
+```
 
-Starting a fresh topology via a single cutter should follow the normal documented steps.  Hopefully your source layer has some internal divisions to help.  In my case I have US state codes and I recommend starting in the center of your layer.  In my case, Arkansas.  An empty topology will be fast and building this initial seed should not take very long.  After that I break the work into two cutters, namely Missouri and Louisiana.  Could I immediately launched a boat load of cutters carefully carving out work zones on state borders?  Yes, but dangers abound.  Keeping your cutters far away from each other is the safest approach.  If you accidentally overlap two work zones - corruption.  If you accidently create a BHF that two cutters touch - corruption.  After losing a few days of work, it can lead a person to be a bit gunshy.  As your topology grows and expands you can add more cutters safely isolated from each other. 
+##### Ring Creation Cost
 
-A valid approach would be to start with multiple seeds, perhaps start in your corners and build inward.  The problem is the danger of the BHF.  Several of my topology runs have ended in failure when a BHF was inadvertently created from too many seeds growing in two many directions.  Yeah, don't do that.  But it's harder than it looks when your polygons may differ greatly in size and extent and you take greedy gulps being annoyed at how long things are taking.  Don't do that.  
-
-I tend to want to skirt around the outside edge and work inward.  Bad idea.  Rather its best to start in the center extending arms outward, then cut away with one (maybe two) cutters in the area between the arms, slowly filling in careful to not ever close the region creating a BHF.  But the attraction of starting cutting out on the edges is always there.  It just needs to be done in a manner that does not close off your work space.  A large BHF is the end, restore a backup and try again.
-
-A small BHF may not be the end of things.  Its never ideal as cutting against any face other than face zero is more expensive.  But if it happens and its not that large, then start bisecting it into smaller portions over and over until you can close the entire thing.  If you have 13 cores cutting on face zero and one core puttering about dicing up a BHF, that is probably okay.  But be careful.  The urge might be to bisect the BHF and put two cores on the two new faces.  But the risk is real that they bump into each other.  Finding corruption is a bad day, having it happen and not noticing can be a bad week.  I tend to just play it safe and only use one core around a BHF.  
-
-### Why is cutting topology polygons so expensive?
-
-The simple explanation is that crafting a new face requires reifying neighboring faces into polygons - recursively walking the edges to craft rings to create polygons.  As of versioon 3.52, the query is simply
+Crafting a new face requires reifying neighboring faces into polygons.  By that I meaning pulling out the relevant edges and recursively walking those edges to craft rings to create polygons.  The temporary polygons fuel the cutting process of the new face to make sure its all topologically correct.  As of versioon 3.52, the query is simply
 ```
 WITH RECURSIVE edgering AS ( 
    SELECT 
@@ -115,8 +126,21 @@ CREATE INDEX dz_covering ON topology_name.edge_data(
    edge_id,abs(next_right_edge),abs(next_left_edge))
 );
 ```
-This allows the recursion to work against the index alone, which if your system has the space to hold in the cache, will be faster than without.  Maintaining this index has a cost and thus its absence is not necessarily a PostGIS bug.   
-  
+This allows the recursion to work against the index alone.  If your system has the space to hold the entire index in the cache, this will be faster.  However adding another index to the edge table also comes with a cost.  I found this index helpful after I reached about 18 million edges. I am not sure its appropriate for small, network or linear topologies.  If I open a ticket I'll put the line here.  
+ 
+### Future Directions
+
+The great thing about PostGIS topology is its ever under development.  Whereas Oracle Spatial has not changed since 2005 and seems unlikely to ever be in a development phase again, PostGIS is continually improving with each release.
+
+* Version 3.6 will swap out 32-bit integer keying for 64-bit integer keying.  This is great, making large topologies more useful.
+
+### Useful Links
+
+* https://trac.osgeo.org/postgis/ticket/5667
+
+### Disclaimer
+
+As with anythign you read on the internet, all advice should be throughly researched before using and that use is at one's own risk.  As much of my background in topologies is related to US government work and contracts, the repository is licensed under the CC-0.  Feel free to open a ticket asking for more specificity or to refute my statements.
 
 
 
