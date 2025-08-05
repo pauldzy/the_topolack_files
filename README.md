@@ -1,4 +1,44 @@
-[SQL-MM 3 Topologies](https://www.iso.org/standard/60343.html) provide many advantages over static vector geometry systems.  Often folks will cite the ability to keep multiple layers of hierarchical entities in harmony or lower storage costs - all true.  However, my focus has been mostly on fast aggregation of numerous and complex polygons.  For all the purposes stated, topologies move the cost of determining adjacency up front.  If one can reify how an entire layer of polygons interact beforehand, one can quickly marshal arbitrary aggregations of those polygons on-demand.  Mathematically unioning together thousands (or even millions) of polygons is a task even the most current CPUs will choke on.  If we already have them in a topology then just determine the universe of faces comprising the aggregation and pull out the edges with one of those faces on one side but not the other.  Then just chain the edges into rings to make the polygon or multi-polygon.  It still can take a while but the gory intersection math is only done once.
+Geographic Information Systems utilize a variety of storage models for persisting spatial information.  Most folks in 2025 only use the long-established [vector-geometry-in-a-record](https://support.esri.com/en-us/gis-dictionary/spaghetti-data) format as stored in Esri shapefiles, OGC geopackages, GeoJSON, etc.  Within these formats, each concise spatial item has an independent existence.  One can alter, delete, or add new items without any affect upon others in the set.  Whether the items in that set or amongst multiple sets makes any spatial sense when considered together is entirely up to the user, the format provides no opinion.  Alternatively, there have always been other formats which decompose spatial features into smaller elements which can be shared amongst many features.  The traditional term for these formats has been the term, topology.  For a good modern example, see [TopoJSON](https://github.com/topojson/topojson).  There are many flavors of topology but for this discussion the subject is winged-edge [SQL-MM 3 Topologies](https://www.iso.org/standard/60343.html).  Implementations in 2025 would include [PostGIS Topology](https://postgis.net/docs/Topology.html) and the now-desolate [Oracle Spatial Topology](https://docs.oracle.com/en/database/oracle/oracle-database/23/topol/topology-data-model-overview.html).  My focus here is on PostGIS though topologies as a concept come into play.
+
+Please note the [Topology functionality](https://pro.arcgis.com/en/pro-app/latest/help/data/topologies/topology-in-arcgis.htm) provided by Esri desktop products is a related but very different animal.  If you are looking for Esri topology help, this is not the place.
+
+### Topics
+
+* [Use Case](#use-case)
+* [Problem Statement](#problem-statement)
+* [Vocabulary](#vocabulary)
+* [Resources](#resources)
+* [PostgreSQL](#postgresql)
+* [Preparation](#preparation)
+* [Multi-Processing](#multi-processing)
+* [Monitoring](#monitoring)
+* [Maintenance](#maintenance)
+* [Corruption](#corruption)
+* [Mitigation](#mitigation)
+
+#### Use Case
+
+#### Problem Statement
+
+#### Vocabulary
+
+#### Resources
+
+#### PostgreSQL
+
+#### Preparation
+
+#### Multi-Processing
+
+#### Monitoring
+
+#### Maintenance
+
+#### Corruption
+
+#### Mitigation
+
+ provide many advantages over static vector geometry systems.  Often folks will cite the ability to keep multiple layers of hierarchical entities in harmony or lower storage costs - all true.  However, my focus has been mostly on fast aggregation of numerous and complex polygons.  For all the purposes stated, topologies move the cost of determining adjacency up front.  If one can reify how an entire layer of polygons interact beforehand, one can quickly marshal arbitrary aggregations of those polygons on-demand.  Mathematically unioning together thousands (or even millions) of polygons is a task even the most current CPUs will choke on.  If we already have them in a topology then just determine the universe of faces comprising the aggregation and pull out the edges with one of those faces on one side but not the other.  Then just chain the edges into rings to make the polygon or multi-polygon.  It still can take a while but the gory intersection math is only done once.
 
 I've been using topologies to model the NHDPlus medium resolution catchment dataset.  Users commonly would like the watershed as a polygon for some arbitrary distance or flow time along a given stream network.  If this navigation crosses six catchments, sure we can mathematically union them together and return the results in short order.  But what about six thousand?  That is where topologies shine as we can get that big honkin six thousand catchment polygon for cheap.  And its the same relative cost if the user wants 5,999 or 6,001 catchments.  Now this doesn't mean we shouldn't try to cache results, caching is always faster.  But if we can't know ahead-of-time if its 5,999 or 6,000; caching every possible combination is not feasible.  Topology aggregation is the best approach I am aware of.
 
@@ -6,7 +46,7 @@ NHDPlus is built from several grids using several SRIDs, the continental US (SRI
 
 ### Quick vocabulary
 
-**topology** - the word is at best imprecise, used across and within many disciplines for quite discrete concepts.  This documentation regards one subdefinition being a data model and modeling system for the storage of winged-edge planar relationships as nodes, edges and faces.  Entities are aggregated from these elements as relation records further abstracted into a database type for storage and easy handling.  Commonly used systems in 2025 would be both my focus here, [PostGIS Topology](https://postgis.net/docs/Topology.html) and the now-desolate [Oracle Spatial Topology](https://docs.oracle.com/en/database/oracle/oracle-database/23/topol/topology-data-model-overview.html).  [Topology functionality](https://pro.arcgis.com/en/pro-app/latest/help/data/topologies/topology-in-arcgis.htm) provided by Esri is a related but very different animal.  If you are looking for Esri help, this is not the place.
+**topology** - the word is at best imprecise, used across and within many disciplines for quite discrete concepts.  This documentation regards one subdefinition being a data model and modeling system for the storage of winged-edge planar relationships as nodes, edges and faces.  Entities are aggregated from these elements as relation records further abstracted into a database type for storage and easy handling.  Commonly used systems in 2025 would be both my focus here, [PostGIS Topology](https://postgis.net/docs/Topology.html) and the now-desolate [Oracle Spatial Topology](https://docs.oracle.com/en/database/oracle/oracle-database/23/topol/topology-data-model-overview.html). 
 
 **face zero** - Face zero is the conceptual face that defines everything outside your topology (Oracle Spatial terms it the "universal face").  In PostGIS topology an edge with face zero on one side is by definition the exterior of your topology.  Face zero is distinct in that its much cheaper to work against and at this time multiple transactions can execute against face zero.  Keeping your activity focused upon face zero to leverage performance and multiprocessing is a huge part of this document. 
 
