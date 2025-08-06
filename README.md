@@ -37,9 +37,13 @@ NHDPlus is built from several elevation grids using several SRIDs.  The continen
 
 #### Vocabulary
 
+**element** - Generic term for node, edge and face primitives in a topology.
+
+**entity** - Generic term for a feature represented by a [TopoGeometry object](https://postgis.net/docs/topogeometry.html) which can be constructed on demand from topology elements.
+
 **face zero** - Face zero is the conceptual face that defines everything outside your topology (SQL-MM and Oracle Spatial term it the "universal face").  In PostGIS topology an edge with face zero on one side is by definition the exterior of your topology.  Face zero is distinct in that its much cheaper to work against and at this time multiple transactions can execute against face zero.  Keeping your activity focused upon face zero to leverage performance and multiprocessing is a huge part of this document. 
 
-**big honkin' face (BHF)** - a BFH is large complex (usually) intermittent face created in the course of building a topology.  Unlike face zero, a BFH must be reified into a polygon for each transaction.  For example, adding a thousand faces along the perimeter of a BHF means walking the BHF's rings and creating a polygon from it's ever changing definition a thousand times.  This is slow.  But more importantly, individual elements (of which the BHF is one) cannot be simultaneously edited.  Any attempt to do so can corrupt your topology.  Avoiding BHFs is a theme of these notes. 
+**big honkin' face (BHF)** - a BHF is large complex (usually) intermittent face created in the course of building a topology.  Unlike face zero, a BFH must be reified into a polygon for each transaction.  For example, adding a thousand faces along the perimeter of a BHF means walking the BHF's rings and creating a polygon from it's ever changing definition a thousand times.  This is slow.  But more importantly, individual elements (of which the BHF is one) cannot be simultaneously edited.  Any attempt to do so can corrupt your topology.  Avoiding BHFs is a theme of these notes. 
 
 **cutter** - a single PostGIS process for adding one or more elements to a topology in a single transaction.  One might imagine them as cookie or pizza cutters clipping face zero into topology elements and entities (whatever metaphor works for you but that is mine).  Please note PostGIS Topology does not officially support multiple concurrent cutter processes at this time.  But we need to use them anyways!  This document is meant to show how to use many cutters simultaneously to greatly speed up topology creation.   
 
