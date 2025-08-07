@@ -39,7 +39,7 @@ NHDPlus is built from several elevation grids using several SRIDs.  The continen
 
 **element** - Generic term for node, edge and face primitives in a topology.
 
-**entity** - Generic term for a feature represented by a [TopoGeometry object](https://postgis.net/docs/topogeometry.html) which can be constructed on demand from topology elements.
+**topology geometry** - Generic term for a feature represented by a [TopoGeometry object](https://postgis.net/docs/topogeometry.html) which can be constructed on demand from topology elements.  Sometimes also known as a feature.  Its the things your topology is seeking to model.  Each topology geometry has an identifier linking to the relation table which further links to all composite elements.
 
 **face zero** - Face zero is the conceptual face that defines everything outside your topology (SQL-MM and Oracle Spatial term it the "universal face").  In PostGIS topology an edge with face zero on one side is by definition the exterior of your topology.  Face zero is distinct in that its much cheaper to work against and at this time multiple transactions can execute against face zero.  Keeping your activity focused upon face zero to leverage performance and multiprocessing is a huge part of this document. 
 
