@@ -166,6 +166,7 @@ The great thing about PostGIS topology is its ever under development.  Whereas O
 
 * https://trac.osgeo.org/postgis/ticket/5667
 * https://gdmc.nl/publications/2010/3D_topological_structure_management_DBMS.pdf
+* https://www.sigterritoires.fr/index.php/en/topology-did-you-say-topology/
 
 ### Disclaimer
 
