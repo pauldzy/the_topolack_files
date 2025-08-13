@@ -33,7 +33,7 @@ But SQL-MM topologies capture how every element relates to its planar neighbors.
 
 NHDPlus is built from several elevation grids using several SRIDs.  The continental US (SRID 5070) is by far the largest and the only one of concern here.  My NHDPlus medium resolution topology of this area ingests 2.8 million catchments creating 7.5 million nodes, 10.8 million edges and 3.2 million faces.  It can take a solid week to throw together depending on resources, approach and time to babysit. However, the more recent [NHDPlus HR](https://www.usgs.gov/national-hydrography/nhdplus-high-resolution) is **a bit** larger delivering 23.3 million catchments.  How long will that take to crunch into a topology?  Are there tricks to speed up the process?  PostGIS bugs to submit?  Or am I going nowhere?  This tract is meant to chronicle the journey in the hopes others might glean some wisdom.
 
-![story so far](images/story_so_far.png)
+[![story so far](images/story_so_far.png)](progress.md)
 
 #### Vocabulary
 
@@ -127,7 +127,15 @@ Breaking down vector geometries into valid topology primitives is a difficult ta
 Recent fixes seem to be squashing many of these but in general they are not a show-stopper.  In almost every case, I have found reordering the way polygons are added resolves the errors.  By that I find two general solutions:
 
 1. Simply bounce on the error avoiding that feature.  Essentially add all the other surrounding features first and then try that one at the end. This resolves 90% of the issues for me.  I just have it coded in my insertion script to catch those errors, add the feature id to an avoid list, and keep going.
-2. When fix #1 fails, remove the surrounding features and their primitives.  Basically create a void where the baddie is to be added.  Then add the baddie as an isolated face into that void.  This should work.  Then afterwards add back in the surrounding features.  
+2. When fix #1 fails, zero in on the problematic feature location and remove the surrounding features and their primitives.  Basically create a void where the baddie is to be added.  Then add the baddie as an isolated face into that void.  This should work.  Then afterwards add back in the surrounding features.
+
+##### Crashes
+
+Being able to fire-and-forget topology creation is key.  One cannot babysit a process that might be measured in months.  Tuning your system and workflow to avoid such crashes is important as one session going down will take all cutters down.  Most of my crashes seem related to memory management.  And yet I think there are multiple causes.  This remains a topic of research:
+
+* I think its valid to accept what PostgreSQL tells you.  If your session receives an clear **out of memory** error before the OOM kills the process, then tune your parameters.
+* If your process crashes but you don't see activity by the OOM killer, it [might be](https://trac.osgeo.org/postgis/ticket/5951) corruption in the topology.
+* If the OOM just swoops in and kills a process without any warning, then I am still not sure of the cause.  Probably parameters or a topology code memory leak....  
 
 ##### Tuning temp_buffers
 
