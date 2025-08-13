@@ -1,4 +1,4 @@
-Geographic Information Systems utilize a variety of storage models for persisting spatial information.  Most folks in 2025 only use the long-established [vector-geometry-in-a-record](https://support.esri.com/en-us/gis-dictionary/spaghetti-data) format as stored in Esri shapefiles, OGC geopackages, GeoJSON, etc.  Within these formats, each "row" lives an independent existence.  One can alter, delete, or add new items without any affect upon others in the set.  Whether the items in that set or amongst multiple sets makes any spatial sense when considered together is entirely up to the user, the format provides no opinion.  Alternatively, there have always been other formats which decompose spatial features into smaller elements aware of their neighbors and shared amongst many features (entities).  The traditional term for these formats has been the term, topology.  For a good modern example, see [TopoJSON](https://github.com/topojson/topojson).  There are many flavors of topology but for this discussion the subject is winged-edge [SQL-MM 3 Topologies](https://www.iso.org/standard/60343.html).  Implementations in 2025 would include [PostGIS Topology](https://postgis.net/docs/Topology.html) and the now-desolate [Oracle Spatial Topology](https://docs.oracle.com/en/database/oracle/oracle-database/23/topol/topology-data-model-overview.html).  My focus here is on PostGIS though topologies as a concept come into play.
+Geographic Information Systems utilize a variety of storage models for persisting spatial information.  Most folks in 2025 only use the long-established [vector-geometry-in-a-record](https://support.esri.com/en-us/gis-dictionary/spaghetti-data) format as stored in Esri shapefiles, OGC geopackages, GeoJSON, etc.  Within these formats, each "row" lives an independent existence.  One can alter, delete, or add new items without any affect upon others in the set.  Whether the items in that set or amongst multiple sets makes any spatial sense when considered together is entirely up to the user, the format provides no opinion.  Alternatively, there have always been other formats which decompose spatial features into smaller elements aware of their neighbors and shared amongst many features.  The traditional term for these formats has been the term, topology.  For a good modern example, see [TopoJSON](https://github.com/topojson/topojson).  There are many flavors of topology but for this discussion the subject is winged-edge [SQL-MM 3 Topologies](https://www.iso.org/standard/60343.html).  Implementations in 2025 would include [PostGIS Topology](https://postgis.net/docs/Topology.html) and the now-desolate [Oracle Spatial Topology](https://docs.oracle.com/en/database/oracle/oracle-database/23/topol/topology-data-model-overview.html).  My focus here is on PostGIS though topologies as a concept come into play.
 
 Please note the [desktop Topology functionality](https://pro.arcgis.com/en/pro-app/latest/help/data/topologies/topology-in-arcgis.htm) provided by Esri desktop products is a related but very different animal.  Esri indeed has a long and storied history with topology formats, but that is mostly history.  If you are looking for technical help with what ArcGIS Pro calls a topology, this is not the place.
 
@@ -39,7 +39,7 @@ NHDPlus is built from several elevation grids using several SRIDs.  The continen
 
 * **element** - Generic term for node, edge and face primitives in a topology.
 
-* **topology geometry** - Generic term for a feature represented by a [TopoGeometry object](https://postgis.net/docs/topogeometry.html) which can be constructed on demand from topology elements.  Sometimes also known as a feature.  Its the things your topology is seeking to model.  Each topology geometry has an identifier linking to the relation table which further links to all composite elements.
+* **topology geometry** - Generic term for a feature represented by a [TopoGeometry object](https://postgis.net/docs/topogeometry.html) which can be constructed on demand from topology elements.  Sometimes also known as a feature.  Its the things your topology is seeking to model.  Each topology geometry object has an identifier linking to the relation table which further links to all composite elements.
 
 * **face zero** - Face zero is the conceptual face that defines everything outside your topology (SQL-MM and Oracle Spatial term it the "universal face").  In PostGIS topology an edge with face zero on one side is by definition the exterior of your topology.  Face zero is distinct in that its much cheaper to work against and at this time multiple transactions can execute against face zero.  Keeping your activity focused upon face zero to leverage performance and multiprocessing is a huge part of this document. 
 
@@ -69,7 +69,7 @@ For many years I crafted large topologies in the dark.  I'd track progress by US
 
 Launching multiple cutters is a key component but exactly how one controls those processes is beyond this document.  Automation is always a goal but at the same time the danger of the process going wrong often argues for closer management and scrutiny of each cutter.  I am a bit ashamed to admit I often just pop off cutting actions as individual pgAdmin or nohup psql commands.  Crafting a control system would be swell but at the same time each topology is unique and for my purposes a one-time event.  Your critiques of my mismanagement of the workflow and suggestions for automation are always appreciated.
 
-Most often topologies are created by just randomly throwing geometry into the maw.  With one cutting process it may not matter much.  There is almost certainly is a more performant order to feed the maw but determining that order may well cost more time and effort than chucking things in randomly.  But that is not an option if you plan to use multiple cutters.  Multiple cutters **must** stay away from each other and **must never** try to alter the same face - with the exception of face zero.   If you accidentally create a BHF, then only one cutter may ever approach and work on that region.  Avoid at all costs.  You need a plan of some kind.  Break your work into discrete untouching regions either by some kind of attribute (say a state or province code) or spatially.  The latter approach can be fraught as your source data is not guaranteed to ever be sensible.  You might have a very long and spindly enitity that cuts across two areas you assume to be spatially distinct. In this example I was cutting on the Alabama Gulf coast with a nice gap between the workers.  But note the danger of that beach polygon closing a good third of my gap.  
+Most often topologies are created by just randomly throwing geometry into the maw.  With one cutting process it may not matter much.  There almost certainly is a more performant order to feed the maw but determining that order may well cost more time and effort than chucking things in randomly.  But that is not an option if you plan to use multiple cutters.  Multiple cutters **must** stay away from each other and **must never** try to alter the same face - with the exception of face zero.   If you accidentally create a BHF, then only one cutter may ever approach and work on that region.  Avoid that scenario at all costs.  You need a plan of some kind.  Break your work into discrete untouching regions either by some kind of attribute (say a state or province code) or spatially.  The latter approach can be fraught as your source data is not guaranteed to ever be sensible.  You might have a very long and spindly enitity that cuts across two areas you assume to be spatially distinct. In this example I was cutting on the Alabama Gulf coast with a nice gap between the workers.  But note the danger of that beach polygon closing a good third of my gap.  
 ![Dangerous Gap](images/dangerous_gap.png)
 
 Make that gap smaller and add another spindly beach reaching out from other side and its disaster.  From this point onward I will keep all cutters far, far away from this danger point until all the area to the north is complete (slight exaggeration as I have outlets still to the northeast).
@@ -82,7 +82,7 @@ Note a small BHF caught early may not be the end of things.  Its never ideal as 
 
 Users should become familiar with the [pgtopo_export and pgtopo_import](https://postgis.net/docs/Topology.html#Topology_Import_Export) command-line tools.  You **will** corrupt your topology.  It just happens.  By far the easiest fix is to fall back to the last good backup.  I would advise (at least) a daily backup regime.  
 
-Note these shell script tools are crafted to only work on the database host as the postgres user under trust authorization, I am not sure why that is.  One can fairly easily poke ident credentials into these scripts to allow remote execution.  In my case I wish to store my backups on the docker host.
+Note these PostGIS shell script tools are crafted to only work on the database host as the postgres user under trust authorization, I am not sure why that is.  A privledged user can fairly easily poke ident credentials into these scripts to allow remote execution.  In my case I wish to store my backups on the docker host.
 
 ##### Validation
 
@@ -96,19 +96,46 @@ Knowing when your topology has gone bad is another important issue.  [Validate t
 
 The [Remove Unused Primitives tool](https://postgis.net/docs/TP_RemoveUnusedPrimitives.html) is useful to prune down the size of your topology.  Normal face creation inserts unneeded edges and nodes as a matter of course.  For my current effort, when I reached about 15 million edges I was able to remove about a million edges using this tool.  That is significant.  But some caveats:  
 
-* The tool cannot run at the same time cutting is taking place, even when separated by half the globe and face 0.  I need to look closer but the tool seems to alter something midstream that greatly upsets any AddFace transactions.  You should only run this tool when the topology is at rest.
+* The tool cannot run at the same time cutting is taking place, even when separated by half the globe and only cutting on face zero.  I need to look closer but the tool seems to alter something midstream that greatly upsets any AddFace transactions.  You should only run this tool when the topology is at rest.
 
 #### Corruption
 
-placeholder for discussion of what conditions can ignored and which are show stoppers
+PostGIS topology creation has gotten better over the years at transaction isolation.  But to be clear, at 3.52 its not.  Take a non-zero face, launch two AddPolygon actions and you will get corruption.  One or both actions will fail but things get committed regardless. Well, sometimes.  I should have a better handle on this but I don't.  Typically the left and right face values on edges may be incorrect or sometimes the face MBR is blank.  I usually do not try to fix things per se, but rather unravel the topology and redo the area.  A typical workflow would be:
+
+1. Identify the feature covering the area of corruption.  You should know how to query back from any edge or face to a feature.
+2. Delete a selection of features in that area.  Usually a 100 meter extent will grab all neighbors but sometimes I remove a larger area if the corruption is widespread.  Note deleting the topogeometry does not remove the elements, one must execute [clearTopoGeom](https://postgis.net/docs/clearTopoGeom.html) to scrub away the relation records.
+3. Execute [RemoveUnusedPrimitives](https://postgis.net/docs/TP_RemoveUnusedPrimitives.html) on the region.  This may remove some corruption and will clear away the valid primitives.  Note if the situation is widespread, clearing the area back to face zero is helpful to see more what is going on.
+4. Inspect the area using QGIS.  Bad edges should stick out. Hand edit them to the correct face values.  I usually run RemoveUnusedPrimitives again to entirely scrub away the area.
+
+This is viable for a handful of bad edges here and there.  But if things are **really** bad then restoring a good backup may be the best way forward.
 
 #### Mitigation
 
 This section is meant to contain actionable advice for creators of large topologies.  Do provide feedback if this is helpful or even more importantly, if not.  Careful benchmarking results obviously would be helpful but one only has so much time and energy to spend.
 
+##### "Minor" topology creation errors
+
+Breaking down vector geometries into valid topology primitives is a difficult task.  Sometimes the processing of incoming geometry just fails.  Common exceptions are:
+
+* Side-location conflict
+* Second line start point too far from first line end point
+* Corrupted topology: adjacent edges
+* index returned tuples in wrong order
+* Spatial exception - geometry intersects edge
+* SQL/MM Spatial exception - geometry crosses a node
+
+Recent fixes seem to be squashing many of these but in general they are not a show-stopper.  In almost every case, I have found reordering the way polygons are added resolves the errors.  By that I find two general solutions:
+
+1. Simply bounce on the error avoiding that feature.  Essentially add all the other surrounding features first and then try that one at the end. This resolves 90% of the issues for me.  I just have it coded in my insertion script to catch those errors, add the feature id to an avoid list, and keep going.
+2. When fix #1 fails, remove the surrounding features and their primitives.  Basically create a void where the baddie is to be added.  Then add the baddie as an isolated face into that void.  This should work.  Then afterwards add back in the surrounding features.  
+
+##### Tuning temp_buffers
+
+As mentioned earlier, I try to tune PostgreSQL to give as much resources as possible to my topology actions.  **temp_buffers** is one of those parameters that get applied per connection.  This is dangerous as many connections can exhaust available memory.  But it also seems key to topology creation as the process heavily utilizes temp table and CTE queries.  In my case I hit a wall where the default 8MB **temp_buffers** suddenly caused every cutter to fail with out of memory errors.  I am not exactly sure of the reasons for that threshold but increasing **temp_buffers** was the fix.
+
 ##### Tossing out constraints
 
-Constraints are great, constraints are good, constraints are your friend.  They can potentially stop you from corrupting your topology.  But they have a cost as each alteration of the edge table must check that node and face ids exist over in those respective tables and next edges exist within itself.  Chatter from strk notes that constraints are not a requirement for building a topology, rather more of a safety net.  Easy enough, just don't fall off the wire.
+Constraints are great, constraints are good, constraints are your friend.  They can potentially stop you from corrupting your topology.  But they have a cost as each alteration of the edge table must check that node and face ids exist over in those respective tables and next edges exist within itself.  Chatter from Sandro notes that constraints are not a requirement for building a topology, rather more of a safety net.  Easy enough, just don't fall off the wire.
 ```
 ALTER TABLE topology_name.edge_data DROP CONSTRAINT end_node_exists;
 ALTER TABLE topology_name.edge_data DROP CONSTRAINT left_face_exists;
