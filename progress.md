@@ -9,3 +9,7 @@
 08/20/2025
 
 ![aug202025](images/story_so_far_3.png)
+
+08/27/2025
+
+![aug202025](images/story_so_far_4.png)
