@@ -17,3 +17,7 @@
 09/03/2025
 
 ![sep032025](images/story_so_far_5.png)
+
+09/11/2025
+
+![sep112025](images/story_so_far_6.png)
