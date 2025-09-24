@@ -17,6 +17,7 @@ Please note the [desktop Topology functionality](https://pro.arcgis.com/en/pro-a
 * [Mitigation](#mitigation)
 * [Future Directions](#future-directions)
 * [Useful Links](#useful-links)
+* [Postflight](#postflight)
 * [Disclaimer](#disclaimer)
 
 #### Use Case
@@ -202,6 +203,20 @@ The great thing about PostGIS topology is its ever under development.  Whereas O
 * https://trac.osgeo.org/postgis/ticket/5667
 * https://gdmc.nl/publications/2010/3D_topological_structure_management_DBMS.pdf
 * https://www.sigterritoires.fr/index.php/en/topology-did-you-say-topology/
+
+#### Postflight
+
+Update: 24 Sep 2025
+
+The topology completed requiring [about 2 months of processing](progress.md).  That is not running 24-7 as frequently things would crash or just complete the current subtasks without my immediately noticing.  However, I did need to pay more attention than I had planned.  I got into a bad habit of checking on things each morning.  Ideally one should just fire-and-forget. 
+
+As creating a valid topology of this size is non-trival, folks are welcome to [grab it](https://dmap-data-commons-ow.s3.amazonaws.com/data/cipsrv/archive/nhdpluscatchment_fabric_20250923_topo.dmp) for their own purposes.  
+
+* 55,601,761 nodes
+* 88,305,045 edges
+* 32,848,277 faces
+
+The end result is expected to help drive watershed aggregation tasks at US EPA.
 
 ### Disclaimer
 
