@@ -25,3 +25,13 @@
 09/18/2025
 
 ![sep112025](images/story_so_far_7.png)
+
+09/24/2025 DONE!
+
+![sep112025](images/story_so_far_8.png)
+
+Final Counts:
+
+* 55,601,761 nodes
+* 88,305,045 edges
+* 32,848,277 faces
